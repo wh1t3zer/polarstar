@@ -1,0 +1,7 @@
+*.log
+
+*.pem
+
+*.yaml
+
+*.toml
