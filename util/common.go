@@ -2,14 +2,14 @@ package util
 
 import (
 	"fmt"
-	"github.com/e421083458/golang_common/lib"
 	"io"
 	"log"
 	"os"
 )
 
-func init() {
-	lib.InitModule("./conf/", []string{"base"})
+func Init() {
+	Banner()
+	InitConfig("./conf/", "base")
 }
 func Banner() {
 	// 打开文件

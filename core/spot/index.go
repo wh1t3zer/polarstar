@@ -5,23 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/adshao/go-binance/v2"
-	"github.com/e421083458/golang_common/lib"
 	"log"
 	"polarstar/util"
 )
 
 var (
-	apiKey        = lib.GetStringConf("base.Binance.Main.apiKey")
-	secretKey     = lib.GetStringConf("base.Binance.Main.secretKey")
-	apiKeyTest    = lib.GetStringConf("base.Binance.Test.apiKeyTest")
-	secretKeyTest = lib.GetStringConf("base.Binance.Test.secretKeyTest")
+	logger = util.NewCustomLogger()
 )
 
 // 现货买入
 // params: orderT: limit(限价单)、market(市价单)、stop(止损单)、stop-limit(限价止损单)
 func SpotOrderBuy(symbol string, quantity string, price string, orderT string) {
 	var orderType binance.OrderType
-	client := binance.NewClient(apiKey, secretKey)
+	client := binance.NewClient(util.ApiKey, util.SecretKey)
 	ctx := context.Background()
 	side := binance.SideTypeBuy
 	switch orderT {
@@ -43,19 +39,20 @@ func SpotOrderBuy(symbol string, quantity string, price string, orderT string) {
 		Price(price).
 		Do(ctx)
 	if err != nil {
-		log.Fatalf("买入失败: %v", err)
+		logger.Error("买入失败: %v", err)
+		return
 	}
 	// 输出订单详情
-	fmt.Printf("订单详情: %+v\n", order)
+	logger.Info("订单详情: %v\n", order)
 }
 
 // 现货卖出
 // params: orderT: limit(限价单)、market(市价单)、stop(止损单)、stop-limit(限价止损单)
 func SpotOrderSell(symbol string, quantity string, price string, orderT string) {
 	var orderType binance.OrderType
-	client := binance.NewClient(apiKey, secretKey)
+	client := binance.NewClient(util.ApiKey, util.SecretKey)
 	ctx := context.Background()
-	side := binance.SideTypeBuy
+	side := binance.SideTypeSell
 	switch orderT {
 	case "limit":
 		orderType = binance.OrderTypeLimit
@@ -74,10 +71,10 @@ func SpotOrderSell(symbol string, quantity string, price string, orderT string) 
 		Price(price).
 		Do(ctx)
 	if err != nil {
-		log.Fatalf("卖出失败: %v", err)
+		logger.Error("卖出失败: %v", err)
 	}
 	// 输出订单详情
-	fmt.Printf("订单详情: %+v\n", order)
+	logger.Info("订单详情: %v", order)
 }
 
 // 现货买入测试
@@ -86,7 +83,7 @@ func SpotOrderBuyTest(symbol string, quantity string, price string, orderT strin
 	// 测试
 	//设置为测试网络（沙盒环境）模拟交易
 	var orderType binance.OrderType
-	client := binance.NewClient(apiKeyTest, secretKeyTest)
+	client := binance.NewClient(util.ApiKeyTest, util.SecretKeyTest)
 	client.BaseURL = binance.BaseAPITestnetURL
 	ctx := context.Background()
 	side := binance.SideTypeBuy
@@ -109,19 +106,18 @@ func SpotOrderBuyTest(symbol string, quantity string, price string, orderT strin
 		TimeInForce("GTC").
 		Price(price).
 		Do(ctx)
-
 	if err != nil {
-		log.Fatalf("创建订单失败: %v", err)
-	} else {
-		fmt.Println("订单创建成功", resp.OrderID)
+		logger.Error("创建订单失败: %v", err)
 	}
+	logger.Info("创建订单成功\n当前买入订单号: %d", resp.OrderID)
+
 }
 
 // 现货卖出测试
 // params: orderT: limit(限价单)、market(市价单)、stop(止损单)、stop-limit(限价止损单)
 func SpotOrderSellTest(symbol string, quantity string, price string, orderT string) {
 	var orderType binance.OrderType
-	client := binance.NewClient(apiKeyTest, secretKeyTest)
+	client := binance.NewClient(util.ApiKeyTest, util.SecretKeyTest)
 	ctx := context.Background()
 	side := binance.SideTypeSell
 	switch orderT {
@@ -152,47 +148,50 @@ func SpotOrderSellTest(symbol string, quantity string, price string, orderT stri
 // 现货撤单
 func SpotCancelOrder(orderId int64) {
 	ctx := context.Background()
-	client := binance.NewClient(apiKey, secretKey)
+	client := binance.NewClient(util.ApiKey, util.SecretKey)
 	cOrder, err := client.NewCancelOrderService().
 		OrderID(orderId).
 		Do(ctx)
 	if err != nil {
-		log.Fatal("撤单失败: ", err)
+		logger.Error("现货撤单失败: %v", err)
+		return
 	}
-	fmt.Println(&cOrder)
+	logger.Info("现货撤单成功\n单号为: %d", cOrder.OrderID)
 }
 
 // 现货撤单测试
 func SpotCancelOrderTest(orderId int64) {
 	ctx := context.Background()
-	client := binance.NewClient(apiKeyTest, secretKeyTest)
+	client := binance.NewClient(util.ApiKeyTest, util.SecretKeyTest)
 	client.BaseURL = binance.BaseAPITestnetURL
 	cOrder, err := client.NewCancelOrderService().
 		OrderID(orderId).
 		Do(ctx)
 	if err != nil {
-		log.Fatal("撤单失败:", err)
+		logger.Error("现货撤单失败: %v", err)
+		return
 	}
+	logger.Info("现货撤单成功\n单号为: %d", cOrder.OrderID)
 	fmt.Println(&cOrder)
 }
 
 // 获取交易历史
 //
 //	func GetTradeHistory() {
-//		client := binance.NewClient(apiKey, secretKey)
+//		client := binance.NewClient(apiKey, util.SecretKey)
 //	}
 //
 // 获取历史测试
 func GetSpotHistoryTest() {
-	client := binance.NewClient(apiKeyTest, secretKeyTest)
+	client := binance.NewClient(util.ApiKeyTest, util.SecretKeyTest)
 	client.BaseURL = binance.BaseAPITestnetURL
 	ctx := context.Background()
 	history, err := client.NewListOrdersService().Do(ctx)
 	if err != nil {
-		fmt.Println("获取交易历史失败:", err)
+		logger.Error("获取交易历史失败: ", err)
 		return
 	}
-	fmt.Println(history)
+	logger.Info("获取交易历史成功: %v", history)
 }
 
 // 获得K线
@@ -200,24 +199,24 @@ func GetSpotKline(symbol string, Itl string) {
 	spotDoneC := make(chan struct{})
 	spotStopC := make(chan struct{})
 	spotHandler := binance.WsKlineHandler(func(event *binance.WsKlineEvent) {
-		fmt.Println(event)
+		fmt.Println(event.Kline)
 	})
 	spotErrHandler := binance.ErrHandler(func(err error) {
 		if err != nil {
-			fmt.Println("spotErr: ", err)
+			logger.Error("k线加载器错误: %v", err)
 			return
 		}
 	})
 	spotDoneC, spotStopC, err := binance.WsKlineServe(symbol, Itl, spotHandler, spotErrHandler)
 	if err != nil {
-		fmt.Println("spot Kline err : ", err)
+		logger.Error("获取现货K线失败: %v", err)
 		return
 	}
 	go func() {
 		for {
 			select {
 			case <-spotStopC:
-				fmt.Println("stop spot stream")
+				logger.Info("关闭现货数据流进程")
 				close(spotStopC)
 			}
 		}
@@ -230,7 +229,7 @@ func GetSpotKline(symbol string, Itl string) {
 func GetOrderList(symbol string) {
 	var info string
 	ctx := context.Background()
-	client := binance.NewClient(apiKey, secretKey)
+	client := binance.NewClient(util.ApiKey, util.SecretKey)
 	res, err := client.NewListOrdersService().
 		Symbol(symbol).Do(ctx)
 	if err != nil {
@@ -248,23 +247,23 @@ func GetOrderList(symbol string) {
 	util.PushWeChatBusiness(info)
 }
 
-// 获得订单列表测试
+// 获得交易订单列表测试
 func GetOrderListTest(symbol string) {
 	// 测试
 	ctx := context.Background()
-	client := binance.NewClient(apiKeyTest, secretKeyTest)
+	client := binance.NewClient(util.ApiKeyTest, util.SecretKeyTest)
 	client.BaseURL = binance.BaseAPITestnetURL
 	res, err := client.NewListOrdersService().
 		Symbol(symbol).
 		Do(ctx)
 	if err != nil {
-		fmt.Println(err)
+		logger.Error("获取订单列表失败: %v", err)
 		return
 	}
 	for _, list := range res {
 		resp, err := json.Marshal(list)
 		if err != nil {
-			return
+			fmt.Println("json编码错误")
 		}
 		fmt.Println(string(resp))
 	}

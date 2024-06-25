@@ -8,16 +8,11 @@ import (
 	"log"
 )
 
-var (
-	apiKey    = Config.Binance.MainNet.ApiKey
-	secretKey = Config.Binance.MainNet.SecretKey
-)
-
 /*
 params : symbol 货币交易对
 */
 func GetRateLimit() {
-	client := binance.NewClient(apiKey, secretKey)
+	client := binance.NewClient(ApiKey, SecretKey)
 	ctx := context.Background()
 	exchangeInfo, err := client.NewExchangeInfoService().Do(ctx)
 	if err != nil {

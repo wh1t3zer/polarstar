@@ -4,17 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/e421083458/golang_common/lib"
 	"io"
 	"net/http"
 	"net/url"
-)
-
-var (
-	BarkKey = lib.GetStringConf("base.Push.Bark.barkKey")
-	BarkUrl = lib.GetStringConf("base.Push.Bark.barkURL")
-	BusURL  = lib.GetStringConf("base.Push.BusWechat.businessURL")
-	BusKey  = lib.GetStringConf("base.Push.BusWechat.businessKey")
 )
 
 type Notification struct {
@@ -57,7 +49,7 @@ func PushMessageBark(body string, title string) {
 		fmt.Println("Error marshalling JSON:", err)
 		return
 	}
-	reqURL := BarkUrl + BarkKey
+	reqURL := BarkURL + BarkKey
 	req, err := http.NewRequest("POST", reqURL, bytes.NewBuffer(requestBody))
 	if err != nil {
 		fmt.Println("Error creating request:", err)
@@ -73,11 +65,9 @@ func PushMessageBark(body string, title string) {
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusOK {
 		logger.Info("Bark信息推送成功")
-		//fmt.Println("Bark信息推送成功")
 		return
 	} else {
-		//fmt.Println("推送失败，请检查配置是否正确")
-		logger.ERROR("推送失败，请检查配置是否正确")
+		logger.Error("推送失败，请检查配置是否正确")
 		return
 	}
 }
@@ -95,8 +85,8 @@ func PushWeChatBusiness(content string) {
 	}
 	client := &http.Client{}
 	params := url.Values{}
-	params.Add("key", BusKey)
-	ReqURL := fmt.Sprintf("%s?%s", BusURL, params.Encode())
+	params.Add("key", BusinessKey)
+	ReqURL := fmt.Sprintf("%s?%s", BusinessURL, params.Encode())
 	busBody, err := json.Marshal(busdata)
 	if err != nil {
 		fmt.Println("json failed: ", err)
@@ -127,12 +117,10 @@ func PushWeChatBusiness(content string) {
 		return
 	}
 	if jsonResponse["errcode"].(float64) == 0 && jsonResponse["errmsg"].(string) == "ok" {
-		//fmt.Println("企业微信信息推送成功")
 		logger.Info("企业微信信息推送成功")
 		return
 	} else {
-		//fmt.Println("推送失败，请检查你的配置是否正确")
-		logger.ERROR("推送失败，请检查你的配置是否正确")
+		logger.Error("推送失败，请检查你的配置是否正确")
 		return
 	}
 }
