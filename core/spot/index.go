@@ -222,7 +222,6 @@ func GetSpotKline(symbol string, Itl string) {
 		}
 	}()
 	<-spotDoneC
-
 }
 
 // 获得所有挂单列表
@@ -248,6 +247,7 @@ func GetOrderList(symbol string) {
 }
 
 // 获得交易订单列表测试
+// BTCUSDT 大写
 func GetOrderListTest(symbol string) {
 	// 测试
 	ctx := context.Background()
@@ -257,7 +257,7 @@ func GetOrderListTest(symbol string) {
 		Symbol(symbol).
 		Do(ctx)
 	if err != nil {
-		logger.Error("获取订单列表失败: %v", err)
+		logger.Error("获取订单列表失败:\n %v", err)
 		return
 	}
 	for _, list := range res {

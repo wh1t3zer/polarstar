@@ -1,40 +1,41 @@
 package CMContract
 
 import (
+	"context"
 	"fmt"
 	"github.com/adshao/go-binance/v2/delivery"
-	"github.com/e421083458/golang_common/lib"
+	"polarstar/util"
+)
+
+var (
+	logger = util.NewCustomLogger()
 )
 
 // 币本位合约
-var (
-	apiKey        = lib.GetStringConf("base.Binance.Main.apiKey")
-	secretKey     = lib.GetStringConf("base.Binance.Main.secretKey")
-	apiKeyTest    = lib.GetStringConf("base.Binance.Test.apiKeyTest")
-	secretKeyTest = lib.GetStringConf("base.Binance.Test.secretKeyTest")
-)
 
 // 合约K线
 func GetCMKline(symbol string, Itl string) {
-	deHandler := delivery.WsKlineHandler(func(event *delivery.WsKlineEvent) {
-		fmt.Println(event)
+	deliveryDoneC := make(chan struct{})
+	deliveryStopC := make(chan struct{})
+	deHandler := delivery.WsContinuousKlineHandler(func(event *delivery.WsContinuousKlineEvent) {
+		fmt.Println(event.Kline)
 	})
 	deErrHandler := delivery.ErrHandler(func(err error) {
 		if err != nil {
-			fmt.Println("dsErr : ", err)
+			logger.Error("币本位合约Err: %v", err)
 			return
 		}
 	})
-	deliveryDoneC, deliveryStopC, err := delivery.WsKlineServe(symbol, Itl, deHandler, deErrHandler)
+	deliveryDoneC, deliveryStopC, err := delivery.WsContinuousKlineServe(symbol, "perpetual", Itl, deHandler, deErrHandler)
 	if err != nil {
-		fmt.Println("dsKline err : ", err)
+		logger.Error("获取币本位合约K线失败: %v", err)
 		return
 	}
 	go func() {
 		for {
 			select {
 			case <-deliveryStopC:
-				fmt.Println("stop delivery stream")
+				logger.Info("关闭币本位通信流进程")
 				close(deliveryStopC)
 				return
 			}
@@ -44,8 +45,17 @@ func GetCMKline(symbol string, Itl string) {
 }
 
 // 调整杠杆
-func ChangeLever() {
-
+func ChangeCMLever(symbol string, lever int) {
+	ctx := context.Background()
+	client := delivery.NewClient(util.ApiKey, util.SecretKey)
+	resp, err := client.NewChangeLeverageService().
+		Leverage(lever).
+		Symbol(symbol).
+		Do(ctx)
+	if err != nil {
+		logger.Error("调整CM杠杆失败:\n %v", err)
+	}
+	logger.Info("更改CM杠杆成功\n当前交易对: %s，杠杆数: %d，最大可开仓资金数: %s", resp.Symbol, resp.Leverage, resp.MaxQuantity)
 }
 
 // 下单买入
