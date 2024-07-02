@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/adshao/go-binance/v2/futures"
+	"github.com/gorilla/websocket"
 	"polarstar/util"
+	"time"
 )
 
 var (
@@ -18,15 +20,26 @@ var (
 	symbol 交易对
 	Itl	  时间段
 */
-func GetUMKline(symbol string, Itl string) {
+func GetUMKline(symbol string, Itl string, conn *websocket.Conn, stopC chan struct{}) {
 	futureDoneC := make(chan struct{})
 	futureStopC := make(chan struct{})
 	fsHandler := futures.WsContinuousKlineHandler(func(event *futures.WsContinuousKlineEvent) {
-		fmt.Println(event.Kline)
+		err := conn.WriteJSON(event.Kline)
+		if err != nil {
+			logger.Error("发送Kline数据到前端失败: %v", err)
+			err := conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Error: %v", err)))
+			if err != nil {
+				return
+			}
+		}
 	})
 	fsErrHandler := futures.ErrHandler(func(err error) {
 		if err != nil {
 			logger.Error("U本位合约Error: %v", err)
+			err := conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Error: %v", err)))
+			if err != nil {
+				return
+			}
 			return
 		}
 	})
@@ -38,18 +51,18 @@ func GetUMKline(symbol string, Itl string) {
 	futureDoneC, futureStopC, err := futures.WsContinuousKlineServe(fsKlineSubcribeArgs, fsHandler, fsErrHandler)
 	if err != nil {
 		logger.Error("获取U本位合约K线失败: %v", err)
+		err := conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Error: %v", err)))
+		if err != nil {
+			return
+		}
 		return
 	}
 	go func() {
-		for {
-			select {
-			case <-futureStopC:
-				logger.Info("关闭U本位通信流进程")
-				close(futureStopC)
-			}
-		}
+		<-stopC
+		close(futureStopC) // 通知 Binance WebSocket 处理停止
 	}()
 	<-futureDoneC
+	logger.Info("关闭U本位通信流进程")
 }
 
 // ChangeUMLever 调整杠杆
@@ -58,15 +71,16 @@ func GetUMKline(symbol string, Itl string) {
 	symbol 交易对
 	lever  杠杆数
 */
-func ChangeUMLever(symbol string, lever int) {
+func ChangeUMLever(symbol string, lever int) *futures.SymbolLeverage {
 	ctx := context.Background()
-	client := futures.NewClient(util.ApiKey, util.SecretKey)
+	client := futures.NewClient(util.BC.Binance.MainNet.ApiKey, util.BC.Binance.MainNet.SecretKey)
 	resp, err := client.NewChangeLeverageService().Symbol(symbol).Leverage(lever).Do(ctx)
 	if err != nil {
 		logger.Error("调整UM杠杆失败: %v", err)
-		return
+		return nil
 	}
 	logger.Info("更改UM杠杆成功\n当前交易对: %s，杠杆数: %d，最大可开仓资金数: %s", resp.Symbol, resp.Leverage, resp.MaxNotionalValue)
+	return resp
 }
 
 // ContractOrderBuy 下单买入
@@ -80,11 +94,12 @@ func ChangeUMLever(symbol string, lever int) {
 	TAKE_PROFIT_MARKET 止盈市价单
 	TRAILING_STOP_MARKET 跟踪止损单
 */
-func ContractOrderBuy(symbol string, quantity string, price string, orderT string, positionSide futures.PositionSideType) {
+func ContractOrderBuy(symbol string, quantity string, price string, orderT string, positionSide futures.PositionSideType, side futures.SideType) (res *futures.CreateOrderResponse, err error) {
 	var orderType futures.OrderType
-	side := futures.SideTypeBuy
 	ctx := context.Background()
-	client := futures.NewClient(util.ApiKey, util.SecretKey)
+	//client := futures.NewClient(util.BC.Binance.MainNet.ApiKey, util.BC.Binance.MainNet.SecretKey)
+	client := futures.NewClient(util.BC.Binance.TestNet.ApiKeyTest1, util.BC.Binance.TestNet.SecretKeyTest1)
+	client.BaseURL = "https://testnet.binancefuture.com"
 	switch orderT {
 	case "limit":
 		orderType = futures.OrderTypeLimit
@@ -93,7 +108,7 @@ func ContractOrderBuy(symbol string, quantity string, price string, orderT strin
 	case "stop":
 		orderType = futures.OrderTypeStop
 	}
-	res, err := client.NewCreateOrderService().
+	res, err = client.NewCreateOrderService().
 		Symbol(symbol).
 		TimeInForce(futures.TimeInForceTypeGTC).
 		Price(price).
@@ -104,168 +119,121 @@ func ContractOrderBuy(symbol string, quantity string, price string, orderT strin
 		Do(ctx)
 	if err != nil {
 		logger.Error("下单失败: %v", err)
+		return nil, err
 	}
-	fmt.Println(res)
+	updateTime := time.Unix(0, res.UpdateTime*int64(time.Millisecond))
+	formattedTime := updateTime.Format("2006-01-02 15:04:05")
+	logger.Info("下单成功:\n 订单ID: %d,订单方向: %s,交易对: %s,下单时间: %s", res.OrderID, res.Side, res.Symbol, formattedTime)
+	return res, nil
 }
 
-// 下单买入测试
-func ContractOrderBuyTest(symbol string, quantity string, price string, orderT string, positionSide futures.PositionSideType) {
-	var orderType futures.OrderType
-	side := futures.SideTypeBuy
-	ctx := context.Background()
-	futures.UseTestnet = true
-	client := futures.NewClient(util.ApiKeyTest, util.SecretKeyTest)
-	switch orderT {
-	case "limit":
-		orderType = futures.OrderTypeLimit
-	case "market":
-		orderType = futures.OrderTypeMarket
-	case "stop":
-		orderType = futures.OrderTypeStop
-	}
-	res, err := client.NewCreateOrderService().
-		Symbol(symbol).
-		TimeInForce(futures.TimeInForceTypeGTC).
-		Price(price).
-		Type(orderType).
-		PositionSide(positionSide).
-		Quantity(quantity).
-		Side(side).
-		Do(ctx)
-	if err != nil {
-		logger.Info("下单失败: %v", err)
-		return
-	}
-	fmt.Println(res)
-}
-
-// 下单卖出
+// 平仓
 func ContractOrderSell() {
 	//ctx := context.Background()
+
 }
 
-//// 下单卖出测试
-//func ContractOrderSellTest() {
-//	ctx := context.Background()
-//	client := futures.NewClient(util.ApiKey, util.SecretKeyTest)
-//	client.NewCreateOrderService().Symbol().Side().Type().Quantity().Price().TimeInForce().Do()
-//}
-
 // 撤单
-func CancelOrder(symbol string, orderId int64) {
+func CancelOrder(symbol string, orderId int64) (resp *futures.CancelOrderResponse, err error) {
 	ctx := context.Background()
-	client := futures.NewClient(util.ApiKey, util.SecretKey)
-	resp, err := client.NewCancelOrderService().
+	//client := futures.NewClient(util.BC.Binance.MainNet.ApiKey, util.BC.Binance.MainNet.SecretKey)
+	client := futures.NewClient(util.ApiKeyTest1, util.SecretKeyTest1)
+	client.BaseURL = "https://testnet.binancefuture.com"
+	resp, err = client.NewCancelOrderService().
 		Symbol(symbol).
 		OrderID(orderId).
 		Do(ctx)
 	if err != nil {
 		logger.Error("撤单失败: %v", err)
-		return
+		return nil, err
 	}
 	logger.Info("U本位撤单成功: %v", resp)
-}
-
-// 撤单测试
-func CancelOrderTest(symbol string, orderId int64) {
-	ctx := context.Background()
-	client := futures.NewClient(util.ApiKeyTest, util.SecretKeyTest)
-	futures.UseTestnet = true
-	resp, err := client.NewCancelOrderService().
-		Symbol(symbol).
-		Do(ctx)
-	if err != nil {
-		logger.Error("撤单失败: %v", err)
-		return
-	}
-	logger.Info("测试撤单成功: %v", resp)
+	return resp, nil
 }
 
 // 批量撤单
-func CancelOrderList(symbol string) {
+func CancelHoldOrderList(symbol string) (err error) {
 	ctx := context.Background()
-	client := futures.NewClient(util.ApiKey, util.SecretKey)
-	err := client.NewCancelAllOpenOrdersService().
+	client := futures.NewClient(util.BC.Binance.TestNet.ApiKeyTest1, util.BC.Binance.TestNet.SecretKeyTest1)
+	client.BaseURL = "https://testnet.binancefuture.com"
+	//client := futures.NewClient(util.BC.Binance.MainNet.ApiKey, util.BC.Binance.MainNet.SecretKey)
+	err = client.NewCancelAllOpenOrdersService().
 		Symbol(symbol).
 		Do(ctx)
 	if err != nil {
-		logger.Error("批量撤单失败: ", err)
-		return
+		logger.Error("批量撤单失败:\n %v", err)
+		return err
 	}
 	logger.Info("U本位批量撤单成功")
-}
-
-// 批量撤单测试
-func CancelOrderListTest(symbol string) {
-	ctx := context.Background()
-	client := futures.NewClient(util.ApiKey, util.SecretKey)
-	futures.UseTestnet = true
-	err := client.NewCancelAllOpenOrdersService().
-		Symbol(symbol).
-		Do(ctx)
-	if err != nil {
-		logger.Error("撤单失败: %v", err)
-		return
-	}
-	logger.Info("批量撤单成功")
+	return nil
 }
 
 // 获取当前所有挂单的信息
-func GetSymbolOrderList(symbol string) {
+func GetHoldOrderList(symbol string) (resp []*futures.Order, err error) {
 	ctx := context.Background()
-	client := futures.NewClient(util.ApiKey, util.SecretKey)
-	resp, err := client.NewListOpenOrdersService().
+	client := futures.NewClient(util.BC.Binance.TestNet.ApiKeyTest1, util.BC.Binance.TestNet.SecretKeyTest1)
+	client.BaseURL = "https://testnet.binancefuture.com"
+	//client := futures.NewClient(util.BC.Binance.MainNet.ApiKey, util.BC.Binance.MainNet.SecretKey)
+	resp, err = client.NewListOpenOrdersService().
 		Symbol(symbol).
 		Do(ctx)
 	if err != nil {
 		logger.Error("获取全部挂单信息失败: %v", err)
-		return
+		return nil, err
 	}
-	logger.Info("获得全部挂单信息成功: %v", resp)
+	logger.Info("获得全部挂单信息成功")
+	return resp, nil
 }
 
-// 获取当前目标挂单信息
-func GetSymbolOrder(symbol string, orderId int64) {
+// 获取当前所选目标挂单信息
+func GetHoldOrder(symbol string, orderId int64) (resp *futures.Order, err error) {
 	ctx := context.Background()
-	client := futures.NewClient(util.ApiKey, util.SecretKey)
-	resp, err := client.NewGetOpenOrderService().
+	client := futures.NewClient(util.BC.Binance.TestNet.ApiKeyTest1, util.BC.Binance.TestNet.SecretKeyTest1)
+	client.BaseURL = "https://testnet.binancefuture.com"
+	//client := futures.NewClient(util.BC.Binance.MainNet.ApiKey, util.BC.Binance.MainNet.SecretKey)
+	resp, err = client.NewGetOpenOrderService().
 		Symbol(symbol).
 		OrderID(orderId).
 		Do(ctx)
 	if err != nil {
 		logger.Error("获取单个挂单信息失败: %v", err)
-		return
+		return nil, err
 	}
 	logger.Info("获得单个挂单信息成功: %v", resp)
+	return resp, nil
 }
 
 // 获得成交历史订单
 // 默认近7天、全部
-func GetUMOrder(symbol string, orderId int64) {
+func GetUMOrder(symbol string) (resp []*futures.Order, err error) {
 	ctx := context.Background()
-	client := futures.NewClient(util.ApiKey, util.SecretKey)
-	resp, err := client.NewListAccountTradeService().
+	//client := futures.NewClient(util.BC.Binance.MainNet.ApiKey, util.BC.Binance.MainNet.SecretKey)
+	client := futures.NewClient(util.BC.Binance.TestNet.ApiKeyTest1, util.BC.Binance.TestNet.SecretKeyTest1)
+	client.BaseURL = "https://testnet.binancefuture.com"
+	resp, err = client.NewListOrdersService().
 		Symbol(symbol).
-		OrderID(orderId).
 		Do(ctx)
 	if err != nil {
 		logger.Error("获得所有U本位订单失败: %v", err)
-		return
+		return nil, err
 	}
-	logger.Info("获得U本位订单成功: %v", resp)
+	logger.Info("获得U本位订单成功")
+	return resp, nil
 }
 
-// 获得成交历史订单测试
-func GetUMOrderTest(symbol string, orderId int64) {
+func GetUMOrderDetail(symbol string, orderID int64) (resp []*futures.Order, err error) {
 	ctx := context.Background()
-	client := futures.NewClient(util.ApiKeyTest, util.SecretKeyTest)
-	resp, err := client.NewListAccountTradeService().
+	//client := futures.NewClient(util.BC.Binance.MainNet.ApiKey, util.BC.Binance.MainNet.SecretKey)
+	client := futures.NewClient(util.BC.Binance.TestNet.ApiKeyTest1, util.BC.Binance.TestNet.SecretKeyTest1)
+	client.BaseURL = "https://testnet.binancefuture.com"
+	resp, err = client.NewListOrdersService().
 		Symbol(symbol).
-		OrderID(orderId).
+		OrderID(orderID).
 		Do(ctx)
 	if err != nil {
-		logger.Error("获得测试所有U本位订单失败: %v", err)
-		return
+		logger.Error("获得所有U本位订单失败: %v", err)
+		return nil, err
 	}
-	logger.Info("获得测试U本位订单成功: %v", resp)
+	logger.Info("获得U本位订单成功")
+	return resp, nil
 }

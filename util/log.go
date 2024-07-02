@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"io"
 	"log"
 	"os"
@@ -53,13 +54,12 @@ func (c *CustomLogger) checkCreateLogFile() error {
 	return nil
 }
 
-// 创建日志文件
+// 创建量化日志文件
 func (c *CustomLogger) createLogFile() error {
 	// 根据当前日期创建日志文件名
 	timestamp := time.Now().Format("2006-01-02")
 	fileName := fmt.Sprintf("polarstar_%s.log", timestamp)
-	filePath := filepath.Join("logs", fileName)
-
+	filePath := filepath.Join("logs/polarstar", fileName)
 	// 打开日志文件
 	logFile, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
@@ -124,4 +124,55 @@ func (c *CustomLogger) Error(msg string, args ...interface{}) {
 func (c *CustomLogger) Fatal(msg string, args ...interface{}) {
 	c.log("FATAL", msg, args...)
 	os.Exit(1)
+}
+
+var Logger *log.Logger
+
+func InitGinLogger() {
+	gin.SetMode(gin.ReleaseMode)
+
+	// 获取当前时间
+	currentTime := time.Now()
+
+	// 如果超过零点，创建新的日志文件
+	if currentTime.Hour() == 0 && currentTime.Minute() == 0 {
+		timestamp := currentTime.Format("2006-01-02")
+		fileName := fmt.Sprintf("record_%s.log", timestamp)
+		filePath := filepath.Join("logs/server", fileName)
+
+		// 打开日志文件
+		logFile, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+		if err != nil {
+			fmt.Printf("创建新的日志文件失败: %v", err)
+			return
+		}
+
+		// 将 Gin 的日志输出设置为使用 Go 的 log 包
+		fileWrite := io.MultiWriter(logFile, os.Stdout)
+
+		// 创建一个新的日志记录器，写入文件
+		Logger = log.New(fileWrite, "", log.LstdFlags)
+		gin.DefaultWriter = Logger.Writer()
+		gin.DefaultErrorWriter = Logger.Writer()
+	} else {
+		// 获取当前日期
+		timestamp := currentTime.Format("2006-01-02")
+		fileName := fmt.Sprintf("record_%s.log", timestamp)
+		filePath := filepath.Join("logs/server", fileName)
+
+		// 打开日志文件
+		logFile, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+		if err != nil {
+			fmt.Printf("创建新的日志文件失败: %v", err)
+			return
+		}
+
+		// 将 Gin 的日志输出设置为使用 Go 的 log 包
+		fileWrite := io.MultiWriter(logFile, os.Stdout)
+
+		// 创建一个新的日志记录器，写入文件
+		Logger = log.New(fileWrite, "", log.LstdFlags)
+		gin.DefaultWriter = Logger.Writer()
+		gin.DefaultErrorWriter = Logger.Writer()
+	}
 }

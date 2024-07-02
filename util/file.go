@@ -8,25 +8,29 @@ import (
 )
 
 var (
-	ApiKey        string
-	SecretKey     string
-	ApiKeyTest    string
-	SecretKeyTest string
-	BarkKey       string
-	BarkURL       string
-	BusinessURL   string
-	BusinessKey   string
+	ApiKey         string
+	SecretKey      string
+	ApiKeyTest     string
+	SecretKeyTest  string
+	ApiKeyTest1    string
+	SecretKeyTest1 string
+	BarkKey        string
+	BarkURL        string
+	BusinessURL    string
+	BusinessKey    string
 )
 
-type baseConfig struct {
+type BaseConfig struct {
 	Binance struct {
 		MainNet struct {
 			ApiKey    string `yaml:"apiKey"`
 			SecretKey string `yaml:"secretKey"`
 		} `yaml:"MainNet"`
 		TestNet struct {
-			ApiKeyTest    string `yaml:"apiKeyTest"`
-			SecretKeyTest string `yaml:"secretKeyTest"`
+			ApiKeyTest     string `yaml:"apiKeyTest"`
+			SecretKeyTest  string `yaml:"secretKeyTest"`
+			ApiKeyTest1    string `yaml:"apiKeyTest1"`
+			SecretKeyTest1 string `yaml:"secretKeyTest1"`
 		} `yaml:"TestNet"`
 	} `yaml:"Binance"`
 	Push struct {
@@ -41,34 +45,63 @@ type baseConfig struct {
 	} `yaml:"Push"`
 }
 
+type CommonConfig struct {
+	Env struct {
+		IsProxy bool   `yaml:"isProxy"`
+		Address string `yaml:"Address"`
+	} `yaml:"Env"`
+	Http struct {
+		Addr           string   `yaml:"addr"`
+		ReadTimeout    int      `yaml:"read_timeout"`
+		WriteTimeout   int      `yaml:"write_timeout"`
+		MaxHeaderBytes int      `yaml:"max_header_bytes"`
+		AllowIP        []string `yaml:"allow_ip"`
+	} `yaml:"http"`
+}
+
 var (
-	Config baseConfig
+	BC BaseConfig
+	CC CommonConfig
 )
 
 // InitConfig initializes the configuration from the given file path and file name
-func InitConfig(filePath string, configFile string) {
+func InitConfig(filePath string, configFile string) *BaseConfig {
 	configPath := fmt.Sprintf("%s/%s.yaml", filePath, configFile)
 	yamlFile, err := os.ReadFile(configPath)
 	if err != nil {
 		logger.Error("读取文件失败: %v", err)
 		os.Exit(1)
 	}
-	err = yaml.Unmarshal(yamlFile, &Config)
+	err = yaml.Unmarshal(yamlFile, &BC)
 	if err != nil {
 		logger.Error("解析配置文件失败: %v", err)
 		os.Exit(1)
 	}
-	if &Config != nil {
-		ApiKey = Config.Binance.MainNet.ApiKey
-		SecretKey = Config.Binance.MainNet.SecretKey
-		ApiKeyTest = Config.Binance.TestNet.ApiKeyTest
-		SecretKeyTest = Config.Binance.TestNet.SecretKeyTest
-		BarkKey = Config.Push.Bark.BarkKey
-		BarkURL = Config.Push.Bark.BarkUrl
-		BusinessKey = Config.Push.BusWechat.BusinessKey
-		BusinessURL = Config.Push.BusWechat.BusinessURL
-		logger.Info("初始化配置成功")
+	if &BC != nil {
+		logger.Info("交易基本配置初始化成功")
+		return &BC
 	} else {
-		logger.Error("初始化配置失败")
+		logger.Error("交易基本配置初始化失败")
+		return nil
+	}
+}
+func InitCommon(filePath string, configFile string) *CommonConfig {
+	configPath := fmt.Sprintf("%s/%s.yaml", filePath, configFile)
+	yamlFile, err := os.ReadFile(configPath)
+	if err != nil {
+		logger.Error("读取文件失败: %v", err)
+		os.Exit(1)
+	}
+	err = yaml.Unmarshal(yamlFile, &CC)
+	if err != nil {
+		logger.Error("解析配置文件失败: %v", err)
+		os.Exit(1)
+	}
+	if &CC != nil {
+		logger.Info("服务器基本配置初始化成功")
+		return &CC
+	} else {
+		logger.Error("服务器基本配置初始化失败")
+		return nil
 	}
 }

@@ -1,16 +1,20 @@
 package main
 
 import (
+	"github.com/gin-gonic/gin"
 	"os"
 	"os/signal"
-	"polarstar/core/contract/UMContract"
+	"polarstar/route"
 	"polarstar/util"
 	"syscall"
 )
 
 func main() {
 	util.Init()
-	UMContract.GetUMKline("BNBUSDT", "1m")
+	util.InitGinLogger()
+	r := gin.Default()
+	route.InitRoutes(r)
+	r.Run(util.CC.Http.Addr)
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGKILL, syscall.SIGQUIT, syscall.SIGINT, syscall.SIGTERM)
 	<-quit

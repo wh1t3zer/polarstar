@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"fmt"
 	"github.com/adshao/go-binance/v2/futures"
 	"polarstar/util"
 )
@@ -20,6 +19,5 @@ func GetUMUserDetail() (userInfo *futures.Account) {
 		logger.Error("获取U本位合约信息失败: %v", err)
 		return nil
 	}
-	fmt.Println(userInfo)
 	return userInfo
 }

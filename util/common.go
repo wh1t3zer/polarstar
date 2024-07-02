@@ -7,9 +7,21 @@ import (
 	"os"
 )
 
-func Init() {
+type Config struct {
+	bc *BaseConfig
+	cc *CommonConfig
+}
+
+func Init() *Config {
 	Banner()
-	InitConfig("./conf/", "base")
+	var AConfig *Config
+	BC := InitConfig("./conf/", "base")
+	CC := InitCommon("./conf/", "common")
+	AConfig = &Config{
+		bc: BC,
+		cc: CC,
+	}
+	return AConfig
 }
 func Banner() {
 	// 打开文件

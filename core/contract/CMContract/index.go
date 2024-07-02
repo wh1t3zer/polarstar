@@ -63,7 +63,7 @@ func ContractOrderBuy() {
 
 }
 
-// 下单卖出
+// 平仓
 func ContractOrderSell() {
 
 }

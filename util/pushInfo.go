@@ -76,24 +76,23 @@ func PushMessageBark(body string, title string) {
 企业微信推送
 params : content:推送消息内容
 */
-func PushWeChatBusiness(content string) {
+func PushWeChatBusiness(content string, args ...interface{}) {
 	busdata := BusinessData{
 		MessageType: "text",
 		Text: BusText{
-			Content: content,
+			Content: fmt.Sprintf(content, args...),
 		},
 	}
 	client := &http.Client{}
 	params := url.Values{}
-	params.Add("key", BusinessKey)
-	ReqURL := fmt.Sprintf("%s?%s", BusinessURL, params.Encode())
+	params.Add("key", BC.Push.BusWechat.BusinessKey)
+	ReqURL := fmt.Sprintf("%s?%s", BC.Push.BusWechat.BusinessURL, params.Encode())
 	busBody, err := json.Marshal(busdata)
 	if err != nil {
 		fmt.Println("json failed: ", err)
 		return
 	}
 	req, err := http.NewRequest("POST", ReqURL, bytes.NewBuffer(busBody))
-	fmt.Println("a?", ReqURL)
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	if err != nil {
 		fmt.Println("创建请求对象失败: ", err)
