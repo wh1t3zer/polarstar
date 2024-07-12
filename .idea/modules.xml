@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/量化.iml" filepath="$PROJECT_DIR$/.idea/量化.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/polarstar-main.iml" filepath="$PROJECT_DIR$/.idea/polarstar-main.iml" />
     </modules>
   </component>
 </project>

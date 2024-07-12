@@ -19,6 +19,8 @@ var (
 	params
 	symbol 交易对
 	Itl	  时间段
+	conn  websocket参数
+	stopC 停止信号
 */
 func GetUMKline(symbol string, Itl string, conn *websocket.Conn, stopC chan struct{}) {
 	futureDoneC := make(chan struct{})
@@ -60,9 +62,9 @@ func GetUMKline(symbol string, Itl string, conn *websocket.Conn, stopC chan stru
 	go func() {
 		<-stopC
 		close(futureStopC) // 通知 Binance WebSocket 处理停止
+		logger.Info("关闭U本位通信流进程")
 	}()
 	<-futureDoneC
-	logger.Info("关闭U本位通信流进程")
 }
 
 // ChangeUMLever 调整杠杆
@@ -85,7 +87,7 @@ func ChangeUMLever(symbol string, lever int) *futures.SymbolLeverage {
 
 // ContractOrderBuy 下单买入
 /*
-	params: orderType
+	tips: orderType
 	LIMIT 限价单
 	MARKET 市价单
 	STOP 止损限价单
@@ -93,6 +95,13 @@ func ChangeUMLever(symbol string, lever int) *futures.SymbolLeverage {
 	TAKE_PROFIT 止盈限价单
 	TAKE_PROFIT_MARKET 止盈市价单
 	TRAILING_STOP_MARKET 跟踪止损单
+	params
+	symbol 交易对
+	quantity 下单数量
+	price  价格
+	orderT	订单类型
+	positionSide 持仓模式	单/双
+	side   买入/做多 卖出/做空
 */
 func ContractOrderBuy(symbol string, quantity string, price string, orderT string, positionSide futures.PositionSideType, side futures.SideType) (res *futures.CreateOrderResponse, err error) {
 	var orderType futures.OrderType
@@ -133,7 +142,12 @@ func ContractOrderSell() {
 
 }
 
-// 撤单
+// CancelOrder 撤单
+/*
+	params
+	symbol 交易对
+	orderId 订单ID
+*/
 func CancelOrder(symbol string, orderId int64) (resp *futures.CancelOrderResponse, err error) {
 	ctx := context.Background()
 	//client := futures.NewClient(util.BC.Binance.MainNet.ApiKey, util.BC.Binance.MainNet.SecretKey)
@@ -151,7 +165,11 @@ func CancelOrder(symbol string, orderId int64) (resp *futures.CancelOrderRespons
 	return resp, nil
 }
 
-// 批量撤单
+// CancelHoldOrderList 批量撤单
+/*
+	params
+	symbol 交易对
+*/
 func CancelHoldOrderList(symbol string) (err error) {
 	ctx := context.Background()
 	client := futures.NewClient(util.BC.Binance.TestNet.ApiKeyTest1, util.BC.Binance.TestNet.SecretKeyTest1)
@@ -168,7 +186,11 @@ func CancelHoldOrderList(symbol string) (err error) {
 	return nil
 }
 
-// 获取当前所有挂单的信息
+// GetHoldOrderList 获取当前所有挂单的信息
+/*
+	params
+	symbol 交易对
+*/
 func GetHoldOrderList(symbol string) (resp []*futures.Order, err error) {
 	ctx := context.Background()
 	client := futures.NewClient(util.BC.Binance.TestNet.ApiKeyTest1, util.BC.Binance.TestNet.SecretKeyTest1)
@@ -185,7 +207,12 @@ func GetHoldOrderList(symbol string) (resp []*futures.Order, err error) {
 	return resp, nil
 }
 
-// 获取当前所选目标挂单信息
+// GetHoldOrder 获取当前所选目标挂单信息
+/*
+	params
+	symbol 交易对
+	oderId 订单号
+*/
 func GetHoldOrder(symbol string, orderId int64) (resp *futures.Order, err error) {
 	ctx := context.Background()
 	client := futures.NewClient(util.BC.Binance.TestNet.ApiKeyTest1, util.BC.Binance.TestNet.SecretKeyTest1)
@@ -203,8 +230,12 @@ func GetHoldOrder(symbol string, orderId int64) (resp *futures.Order, err error)
 	return resp, nil
 }
 
-// 获得成交历史订单
+// GetUMOrder 获得成交历史订单
 // 默认近7天、全部
+/*
+	params
+	symbol 交易对
+*/
 func GetUMOrder(symbol string) (resp []*futures.Order, err error) {
 	ctx := context.Background()
 	//client := futures.NewClient(util.BC.Binance.MainNet.ApiKey, util.BC.Binance.MainNet.SecretKey)
@@ -221,6 +252,12 @@ func GetUMOrder(symbol string) (resp []*futures.Order, err error) {
 	return resp, nil
 }
 
+// GetUMOrderDetail 获得某个历史订单
+/*
+	params
+	symbol 交易对
+	orderID 订单号
+*/
 func GetUMOrderDetail(symbol string, orderID int64) (resp []*futures.Order, err error) {
 	ctx := context.Background()
 	//client := futures.NewClient(util.BC.Binance.MainNet.ApiKey, util.BC.Binance.MainNet.SecretKey)
@@ -236,4 +273,24 @@ func GetUMOrderDetail(symbol string, orderID int64) (resp []*futures.Order, err 
 	}
 	logger.Info("获得U本位订单成功")
 	return resp, nil
+}
+
+func GetHistoryKline(symbol string, Itl string, limit int) (resList []futures.Kline, total int) {
+	ctx := context.Background()
+	total = 0
+	client := futures.NewClient(util.BC.Binance.TestNet.ApiKeyTest1, util.BC.Binance.TestNet.SecretKeyTest1)
+	resp, err := client.NewKlinesService().
+		Symbol(symbol).
+		Interval(Itl).
+		Limit(limit).
+		Do(ctx)
+	if err != nil {
+		logger.Error("创建K线失败:\n %v", err)
+		return nil, total
+	}
+	for _, res := range resp {
+		resList = append(resList, *res)
+		total++
+	}
+	return resList, total
 }

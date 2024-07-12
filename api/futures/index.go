@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/websocket"
 	"net/http"
 	"polarstar/core/contract/UMContract"
+	"polarstar/core/contract/UMContract/user"
 	"strconv"
 )
 
@@ -185,8 +186,8 @@ func GetUMOrderDetail(c *gin.Context) {
 
 // 获得K线
 func GetUMKline(c *gin.Context) {
-	symbol := "BTCUSDT" // 从消息中解析 symbol
-	interval := "1m"    // 从消息中解析 interval
+	symbol := c.Query("symbol")
+	interval := c.Query("interval")
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		fmt.Printf("Failed to set websocket upgrade: %+v\n", err)
@@ -201,10 +202,19 @@ func GetUMKline(c *gin.Context) {
 	for {
 		_, _, err := conn.ReadMessage()
 		if err != nil {
-			fmt.Printf("Read error: %+v\n", err)
 			close(stopC) // 通知 GetUMKline 函数停止
 			break
 		}
 	}
-	fmt.Println("WebSocket connection closed")
+}
+
+func GetUMUserInfo(c *gin.Context) {
+	resp := user.GetUMUserDetail()
+	c.JSON(200, resp)
+}
+
+func Tet(c *gin.Context) {
+	resp, total := UMContract.GetHistoryKline("BTCUSDT", "1h", 5)
+	fmt.Println(total)
+	c.JSON(200, resp)
 }

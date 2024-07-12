@@ -126,8 +126,6 @@ func (c *CustomLogger) Fatal(msg string, args ...interface{}) {
 	os.Exit(1)
 }
 
-var Logger *log.Logger
-
 func InitGinLogger() {
 	gin.SetMode(gin.ReleaseMode)
 
@@ -151,9 +149,9 @@ func InitGinLogger() {
 		fileWrite := io.MultiWriter(logFile, os.Stdout)
 
 		// 创建一个新的日志记录器，写入文件
-		Logger = log.New(fileWrite, "", log.LstdFlags)
-		gin.DefaultWriter = Logger.Writer()
-		gin.DefaultErrorWriter = Logger.Writer()
+		glogger := log.New(fileWrite, "", log.LstdFlags)
+		gin.DefaultWriter = glogger.Writer()
+		gin.DefaultErrorWriter = glogger.Writer()
 	} else {
 		// 获取当前日期
 		timestamp := currentTime.Format("2006-01-02")
@@ -171,8 +169,8 @@ func InitGinLogger() {
 		fileWrite := io.MultiWriter(logFile, os.Stdout)
 
 		// 创建一个新的日志记录器，写入文件
-		Logger = log.New(fileWrite, "", log.LstdFlags)
-		gin.DefaultWriter = Logger.Writer()
-		gin.DefaultErrorWriter = Logger.Writer()
+		glogger := log.New(fileWrite, "", log.LstdFlags)
+		gin.DefaultWriter = glogger.Writer()
+		gin.DefaultErrorWriter = glogger.Writer()
 	}
 }
